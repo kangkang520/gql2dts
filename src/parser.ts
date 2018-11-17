@@ -57,7 +57,7 @@ function baseTypes(custom: Exclude<IParseOption['customscalarTypes'], undefined>
 			})
 			.filter(s => !!s),
 		//函数定义
-		'interface GFunction<P, R> {',
+		'interface GQLFunction<P, R> {',
 		'	(a: P): R',
 		'	args: P',
 		'}',
@@ -69,10 +69,13 @@ function parseScalar(type: graphql.GraphQLScalarType, customscalarTypes: IParseO
 	return `${mkdesc(type.description)}export type ${type.name} = ${typeName}`
 }
 
-function type2ts(type: graphql.TypeNode, nullableType: TNullableTypeFunc): string {
-	if (type.kind == 'ListType') return `Array<${type2ts(type.type, nullableType)}>`
-	else if (type.kind == 'NonNullType') return `${type2ts(type.type, nullableType)}`
-	else return nullableType!(type.name.value)
+function type2ts(type: graphql.TypeNode, nullableType: TNullableTypeFunc, isNotNull = false): string {
+	//此函数用于自动加入空处理
+	const addNull = (val: string) => isNotNull ? val : nullableType!(val)
+	//分别处理不同类型
+	if (type.kind == 'ListType') return addNull(`Array<${type2ts(type.type, nullableType, false)}>`)
+	else if (type.kind == 'NonNullType') return `${type2ts(type.type, nullableType, true)}`
+	else return addNull(type.name.value)
 }
 
 function parseObject(type: graphql.GraphQLObjectType | graphql.GraphQLInterfaceType | graphql.GraphQLInputObjectType, objectType: IParseOption['objectType'], argument2interface: boolean, nullableType: TNullableTypeFunc) {
@@ -84,14 +87,15 @@ function parseObject(type: graphql.GraphQLObjectType | graphql.GraphQLInterfaceT
 		if (!ast) return null
 		//如果有参数则返回函数
 		if ((ast.kind == 'FieldDefinition') && ast.arguments && ast.arguments.length) {
+			console.log(ast.arguments)
 			const args = ast.arguments.map(arg => `${arg.name.value}: ${type2ts(arg.type, nullableType)}`)
 			if (argument2interface) {
-				const interfaceName = `I${upperCaseName(name)}On${upperCaseName(type.name)}Arguments`
+				const interfaceName = `I${upperCaseName(key)}On${upperCaseName(type.name)}Arguments`
 				argTypes.push(`interface ${interfaceName} {\n\t${args.join('\n\t')}\n}`)
-				return `${mkdesc(desc)}${name}: GQLFunction<{ ${interfaceName}, ${type2ts(ast.type, nullableType)}>`
+				return `${mkdesc(desc)}${key}: GQLFunction<${interfaceName}, ${type2ts(ast.type, nullableType)}>`
 			}
 			else {
-				return `${mkdesc(desc)}${name}: GQLFunction<{ ${args.join(', ')} }, ${type2ts(ast.type, nullableType)}>`
+				return `${mkdesc(desc)}${key}: GQLFunction<${args.join(', ')} }, ${type2ts(ast.type, nullableType)}>`
 			}
 		}
 		//否则返回类型
