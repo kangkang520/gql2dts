@@ -57,10 +57,12 @@ function baseTypes(custom: Exclude<IParseOption['customscalarTypes'], undefined>
 			})
 			.filter(s => !!s),
 		//函数定义
-		'interface GQLFunction<P, R> {',
+		'interface GQLFunctionBase<P, R> {',
 		'	(a: P): R',
 		'	args: P',
 		'}',
+		'',
+		'type GQLFunction<P, R> = GQLFunctionBase<P, R> & R',
 	].join('\n')
 }
 
