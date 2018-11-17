@@ -87,7 +87,6 @@ function parseObject(type: graphql.GraphQLObjectType | graphql.GraphQLInterfaceT
 		if (!ast) return null
 		//如果有参数则返回函数
 		if ((ast.kind == 'FieldDefinition') && ast.arguments && ast.arguments.length) {
-			console.log(ast.arguments)
 			const args = ast.arguments.map(arg => `${arg.name.value}: ${type2ts(arg.type, nullableType)}`)
 			if (argument2interface) {
 				const interfaceName = `I${upperCaseName(key)}On${upperCaseName(type.name)}Arguments`
