@@ -1,0 +1,38 @@
+{
+  "name": "gql2dts",
+  "version": "1.0.1",
+  "description": "",
+  "main": "dist/index.js",
+  "types": "typing/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "ts-node --files test/test.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://git.iemmp.com/yizhi/gql2dts.git"
+  },
+  "keywords": [
+    "graphql",
+    "typescript",
+    "declare",
+    "define",
+    "definition",
+    "gql",
+    "gql2ts",
+    "parse",
+    "convert"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/globby": "^8.0.0",
+    "@types/graphql": "^14.0.3",
+    "typescript": "^3.1.6"
+  },
+  "dependencies": {
+    "globby": "^8.0.1",
+    "graphql": "^14.0.2",
+    "graphql-tools": "^4.0.3"
+  }
+}

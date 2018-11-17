@@ -1,0 +1,6 @@
+/node_modules
+/.DS_Stroe
+/package-lock.json
+/dist
+/test
+/typing
