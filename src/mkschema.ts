@@ -21,7 +21,7 @@ export function mkSchema(dirname: string, rootGlobs: string | Array<string>, fil
 	//读取文件内容
 	const fileBody = files.map(file => fs.readFileSync(file) + '').join('\n')
 	//生成schema
-	const schemas = roots.map(root => makeExecutableSchema({ typeDefs: fileBody + '\n' + fs.readFileSync(root) }))
+	const schemas = roots.map(root => makeExecutableSchema({ typeDefs: fileBody + '\n' + fs.readFileSync(root), resolverValidationOptions: { requireResolversForResolveType: false } }))
 	//合并并返回schema
 	return mergeSchemas({ schemas })
 }
