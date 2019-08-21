@@ -1,6 +1,6 @@
 {
   "name": "gql2dts",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "",
   "main": "dist/index.js",
   "types": "typing/index.d.ts",
@@ -10,7 +10,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "http://git.iemmp.com/yizhi/gql2dts.git"
+    "url": "https://github.com/kangkang520/gql2dts.git"
   },
   "keywords": [
     "graphql",
@@ -28,11 +28,13 @@
   "devDependencies": {
     "@types/globby": "^8.0.0",
     "@types/graphql": "^14.0.3",
-    "typescript": "^3.1.6"
+    "ts-node": "^8.3.0",
+    "typescript": "^3.5.3"
   },
   "dependencies": {
     "globby": "^8.0.1",
     "graphql": "^14.0.2",
-    "graphql-tools": "^4.0.3"
+    "graphql-tools": "^4.0.3",
+    "merge-graphql-schemas": "^1.7.0"
   }
 }

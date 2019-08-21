@@ -14,7 +14,9 @@ export interface IParseOption {
 	/** 自定义标量类型, 默认为：`{String: 'string', Boolean: 'boolean', Int: 'number', Float: 'number', ID: 'string | number'}` */
 	customscalarTypes?: { [P in 'String' | 'Boolean' | 'Int' | 'Float' | 'ID' | string]?: string }
 	/** 可以为空的数据类型，默认全部都是：type=>type+' | null | undefined' */
-	nullableType?: { [P in 'input' | 'interface' | 'object']?: (type: string) => string }
+	nullableType?: { [P in 'input' | 'interface' | 'object']?: (type: string, defaultVal: graphql.ValueNode | null) => string }
+	/** 是否将带默认值的参数转换为非空，默认true */
+	notNullWhenDefaultValue?: boolean
 }
 
 type TNullableTypeFunc = Exclude<IParseOption['nullableType'], undefined>[keyof Exclude<IParseOption['nullableType'], undefined>]
@@ -71,12 +73,12 @@ function parseScalar(type: graphql.GraphQLScalarType, customscalarTypes: IParseO
 	return `${mkdesc(type.description)}export type ${type.name} = ${typeName}`
 }
 
-function type2ts(type: graphql.TypeNode, nullableType: TNullableTypeFunc, isNotNull = false): string {
+function type2ts(type: graphql.TypeNode, nullableType: TNullableTypeFunc, defaultValue: graphql.ValueNode | null, isNotNull: boolean): string {
 	//此函数用于自动加入空处理
-	const addNull = (val: string) => isNotNull ? val : nullableType!(val)
+	const addNull = (val: string) => (isNotNull || !nullableType) ? val : nullableType(val, defaultValue)
 	//分别处理不同类型
-	if (type.kind == 'ListType') return addNull(`Array<${type2ts(type.type, nullableType, false)}>`)
-	else if (type.kind == 'NonNullType') return `${type2ts(type.type, nullableType, true)}`
+	if (type.kind == 'ListType') return addNull(`Array<${type2ts(type.type, nullableType, null, false)}>`)
+	else if (type.kind == 'NonNullType') return `${type2ts(type.type, nullableType, null, true)}`
 	else return addNull(type.name.value)
 }
 
@@ -89,18 +91,20 @@ function parseObject(type: graphql.GraphQLObjectType | graphql.GraphQLInterfaceT
 		if (!ast) return null
 		//如果有参数则返回函数
 		if ((ast.kind == 'FieldDefinition') && ast.arguments && ast.arguments.length) {
-			const args = ast.arguments.map(arg => `${arg.name.value}: ${type2ts(arg.type, nullableType)}`)
+			const args = ast.arguments.map(arg => {
+				return `${arg.name.value}: ${type2ts(arg.type, nullableType, arg.defaultValue || null, false)}`
+			})
 			if (argument2interface) {
 				const interfaceName = `I${upperCaseName(key)}On${upperCaseName(type.name)}Arguments`
 				argTypes.push(`interface ${interfaceName} {\n\t${args.join('\n\t')}\n}`)
-				return `${mkdesc(desc)}${key}: GQLFunction<${interfaceName}, ${type2ts(ast.type, nullableType)}>`
+				return `${mkdesc(desc)}${key}: GQLFunction<${interfaceName}, ${type2ts(ast.type, nullableType, null, false)}>`
 			}
 			else {
-				return `${mkdesc(desc)}${key}: GQLFunction<${args.join(', ')} }, ${type2ts(ast.type, nullableType)}>`
+				return `${mkdesc(desc)}${key}: GQLFunction<${args.join(', ')} }, ${type2ts(ast.type, nullableType, null, false)}>`
 			}
 		}
 		//否则返回类型
-		else return `${mkdesc(desc)}${key}: ${type2ts(ast.type, nullableType)}`
+		else return `${mkdesc(desc)}${key}: ${type2ts(ast.type, nullableType, null, false)}`
 	}).filter(t => !!t).map(type => (type || '').replace(/\n/g, '\n\t'))
 	//加入节点类型
 	if (objectType == 'interface') argTypes.push(`${mkdesc(type.description || undefined)}export interface ${type.name} {\n\t${types.join('\n\t')}\n}`)
@@ -125,9 +129,16 @@ export function parse(schema: graphql.GraphQLSchema, {
 	outputType = 'declare',
 	argument2interface = true,
 	customscalarTypes = {},
-	nullableType = {}
+	nullableType = {},
+	notNullWhenDefaultValue = true,
 }: IParseOption = {}) {
-	const defaultNullableType = (type: string) => `${type} | null | undefined`
+	const defaultNullableType = (type: string, defaultVal: graphql.ValueNode | null) => {
+		if (defaultVal) {
+			if (defaultVal.kind != 'NullValue' && notNullWhenDefaultValue) return type
+			return `${type} | null`
+		}
+		return `${type} | null | undefined`
+	}
 	const typeMap = schema.getTypeMap()
 	const types = [baseTypes(customscalarTypes)]
 	//处理数据类型

@@ -1,0 +1,9 @@
+# test
+type User {
+	id: ID!
+	name: String
+}
+
+type Query {
+	users(page: Int=0, pageSize: Int=null): User
+}
