@@ -1,5 +1,12 @@
 import * as graphql from 'graphql'
 
+
+interface INullableTypeOption {
+	type: string
+	defaultVal: graphql.ValueNode | null
+	isArgument: boolean
+}
+
 export interface IParseOption {
 	/** 以哪种方式转换enum类型，可以转换为enum或type，默认type */
 	enumType?: 'enum' | 'type'
@@ -14,7 +21,7 @@ export interface IParseOption {
 	/** 自定义标量类型, 默认为：`{String: 'string', Boolean: 'boolean', Int: 'number', Float: 'number', ID: 'string | number'}` */
 	customscalarTypes?: { [P in 'String' | 'Boolean' | 'Int' | 'Float' | 'ID' | string]?: string }
 	/** 可以为空的数据类型，默认全部都是：type=>type+' | null | undefined' */
-	nullableType?: { [P in 'input' | 'interface' | 'object']?: (type: string, defaultVal: graphql.ValueNode | null) => string }
+	nullableType?: { [P in 'input' | 'interface' | 'object']?: (option: INullableTypeOption) => string }
 	/** 是否将带默认值的参数转换为非空，默认true */
 	notNullWhenDefaultValue?: boolean
 }
@@ -73,12 +80,13 @@ function parseScalar(type: graphql.GraphQLScalarType, customscalarTypes: IParseO
 	return `${mkdesc(type.description)}export type ${type.name} = ${typeName}`
 }
 
-function type2ts(type: graphql.TypeNode, nullableType: TNullableTypeFunc, defaultValue: graphql.ValueNode | null, isNotNull: boolean): string {
+function type2ts(type: graphql.TypeNode, option: { nullableType: TNullableTypeFunc, defaultValue: graphql.ValueNode | null, isNotNull: boolean, isArgument: boolean }): string {
+	const { nullableType, defaultValue, isNotNull, isArgument } = option
 	//此函数用于自动加入空处理
-	const addNull = (val: string) => (isNotNull || !nullableType) ? val : nullableType(val, defaultValue)
+	const addNull = (val: string) => (isNotNull || !nullableType) ? val : nullableType({ type: val, defaultVal: defaultValue, isArgument })
 	//分别处理不同类型
-	if (type.kind == 'ListType') return addNull(`Array<${type2ts(type.type, nullableType, null, false)}>`)
-	else if (type.kind == 'NonNullType') return `${type2ts(type.type, nullableType, null, true)}`
+	if (type.kind == 'ListType') return addNull(`Array<${type2ts(type.type, { nullableType, defaultValue: null, isNotNull: false, isArgument: false })}>`)
+	else if (type.kind == 'NonNullType') return `${type2ts(type.type, { nullableType, defaultValue: null, isNotNull: true, isArgument: false })}`
 	else return addNull(type.name.value)
 }
 
@@ -92,19 +100,19 @@ function parseObject(type: graphql.GraphQLObjectType | graphql.GraphQLInterfaceT
 		//如果有参数则返回函数
 		if ((ast.kind == 'FieldDefinition') && ast.arguments && ast.arguments.length) {
 			const args = ast.arguments.map(arg => {
-				return `${arg.name.value}: ${type2ts(arg.type, nullableType, arg.defaultValue || null, false)}`
+				return `${arg.name.value}: ${type2ts(arg.type, { nullableType, defaultValue: arg.defaultValue || null, isNotNull: false, isArgument: true })}`
 			})
 			if (argument2interface) {
 				const interfaceName = `I${upperCaseName(key)}On${upperCaseName(type.name)}Arguments`
 				argTypes.push(`interface ${interfaceName} {\n\t${args.join('\n\t')}\n}`)
-				return `${mkdesc(desc)}${key}: GQLFunction<${interfaceName}, ${type2ts(ast.type, nullableType, null, false)}>`
+				return `${mkdesc(desc)}${key}: GQLFunction<${interfaceName}, ${type2ts(ast.type, { nullableType, defaultValue: null, isNotNull: false, isArgument: false })}>`
 			}
 			else {
-				return `${mkdesc(desc)}${key}: GQLFunction<${args.join(', ')} }, ${type2ts(ast.type, nullableType, null, false)}>`
+				return `${mkdesc(desc)}${key}: GQLFunction<${args.join(', ')} }, ${type2ts(ast.type, { nullableType, defaultValue: null, isNotNull: false, isArgument: false })}>`
 			}
 		}
 		//否则返回类型
-		else return `${mkdesc(desc)}${key}: ${type2ts(ast.type, nullableType, null, false)}`
+		else return `${mkdesc(desc)}${key}: ${type2ts(ast.type, { nullableType, defaultValue: null, isNotNull: false, isArgument: false })}`
 	}).filter(t => !!t).map(type => (type || '').replace(/\n/g, '\n\t'))
 	//加入节点类型
 	if (objectType == 'interface') argTypes.push(`${mkdesc(type.description || undefined)}export interface ${type.name} {\n\t${types.join('\n\t')}\n}`)
@@ -132,7 +140,7 @@ export function parse(schema: graphql.GraphQLSchema, {
 	nullableType = {},
 	notNullWhenDefaultValue = true,
 }: IParseOption = {}) {
-	const defaultNullableType = (type: string, defaultVal: graphql.ValueNode | null) => {
+	const defaultNullableType = ({ defaultVal, type }: INullableTypeOption) => {
 		if (defaultVal) {
 			if (defaultVal.kind != 'NullValue' && notNullWhenDefaultValue) return type
 			return `${type} | null`
