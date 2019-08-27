@@ -1,6 +1,6 @@
 {
   "name": "gql2dts",
-  "version": "1.0.10",
+  "version": "1.0.11",
   "description": "",
   "main": "dist/index.js",
   "types": "typing/index.d.ts",
